@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PROFILE CHECKER</title>
+</head>
+<body>
+<label for="address">Enter the address of the profile you would like to check:</label>
+<input id="address" type="text" name="address" placeholder="0x.....">
+<button id="search" type="submit">Search</button>
+
+<h4>Similar Faces</h4>
+<div id="results">
+    
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
+
+<script type="text/javascript">
+
+
+var isAddress = function (address) {
+  console.log("checking is address "+ address)
+    if (!/^(0x)?[0-9a-f]{40}$/i.test(address)) {
+        // check if it has the basic requirements of an address
+        return false;
+    } else if (/^(0x)?[0-9a-f]{40}$/.test(address) || /^(0x)?[0-9A-F]{40}$/.test(address)) {
+        // If it's all small caps or all all caps, return true
+        return true;
+    } else {
+        // Otherwise check each case
+        return isChecksumAddress(address);
+    }
+};
+
+var isChecksumAddress = function (address) {
+    // Check each case
+    address = address.replace('0x','');
+    var addressHash = sha3(address.toLowerCase());
+    for (var i = 0; i < 40; i++ ) {
+        // the nth letter should be uppercase if the nth digit of casemap is 1
+        if ((parseInt(addressHash[i], 16) > 7 && address[i].toUpperCase() !== address[i]) || (parseInt(addressHash[i], 16) <= 7 && address[i].toLowerCase() !== address[i])) {
+            return false;
+        }
+    }
+    return true;
+};
+
+$('#search').click(function(){
+    $('#search').html('LOADING...(this can take a while)');
+
+    let address = $('#address').val()
+    if(isAddress(address)){
+    console.log("address seems valid, processing request");
+      $.ajax({url: "/check/"+address}).done(function(data) {
+        console.log(data)
+        $('#results').html('')
+        for(let item in data){
+          $('#results').append("<a href='https://app.proofofhumanity.id/profile/"+data[item]+"?network=mainnet'><img src='/faces/"+data[item]+".jpg' width='300px' height='auto'/><br>"+data[item]+"</a><br>")
+        }
+
+        $('#search').html('Search');
+      });
+    }else{
+      console.log("failed address check")
+    }
+    
+})
+
+</script>
+
+</body>
+</html>
