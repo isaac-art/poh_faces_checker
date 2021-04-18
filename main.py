@@ -235,7 +235,7 @@ def get_profile_image(path, human):
             f.write(res.content)
         return f'{path}/image.jpg'
     except Exception as e:
-        return "error processing profile details"
+        return e
 
 @app.get("/check/{address}")
 async def check_profile(address):
