@@ -233,9 +233,9 @@ def get_profile_image(path, human):
         res = requests.get(file)
         with open(f"{path}/image.jpg", 'wb') as f:
             f.write(res.content)
-        return f'{path}/image.jpg'
+        return (True, f'{path}/image.jpg')
     except Exception as e:
-        return e
+        return (False, e)
 
 @app.get("/check/{address}")
 async def check_profile(address):
@@ -245,14 +245,16 @@ async def check_profile(address):
         folder = "temp/"+address
         temp_path = os.path.join(os.path.abspath(os.getcwd()), folder)
         check_dirs(temp_path)
-        input = get_profile_image(temp_path, profile["data"]["submission"])
-
-        encodings, face_ids = read_encodings_file()
-        ret, matches = face_comparisons(input, encodings, face_ids)
-        if ret:
-            return matches
+        gpi_res, input = get_profile_image(temp_path, profile["data"]["submission"])
+        if gpi_res:
+            encodings, face_ids = read_encodings_file()
+            ret, matches = face_comparisons(input, encodings, face_ids)
+            if ret:
+                return matches
+            else:
+                return False
         else:
-            return False
+            return input
 
 # @app.get("/image/{address}")
 # async def get_image(address):
