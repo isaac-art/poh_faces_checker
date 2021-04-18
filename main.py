@@ -218,6 +218,7 @@ def get_profile_image(path, human):
         file = f"https://ipfs.kleros.io{uri}"
         res = requests.get(file)
         jres = res.json()
+        print("open evidence json")
         with open(f"{path}/evidence.json", 'w') as f:
             json.dump(jres, f)
         
@@ -225,12 +226,14 @@ def get_profile_image(path, human):
         file = f"https://ipfs.kleros.io{uri}"
         res = requests.get(file)
         jres = res.json()
+        print("open reg json")
         with open(f"{path}/registration.json", 'w') as f:
             json.dump(jres, f)
 
         uri = jres["photo"]
         file = f"https://ipfs.kleros.io{uri}"
         res = requests.get(file)
+        print("open reg image")
         with open(f"{path}/image.jpg", 'wb') as f:
             f.write(res.content)
         return (True, f'{path}/image.jpg')
