@@ -258,6 +258,8 @@ async def check_profile(address):
                 return False
         else:
             return (False, input)
+    else:
+        return (False, False)
 
 # @app.get("/image/{address}")
 # async def get_image(address):
