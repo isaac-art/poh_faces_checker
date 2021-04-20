@@ -29,10 +29,10 @@ def main(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
-@app.get("/json")
-async def read_json_file():
-    global dataset_filename
-    return FileResponse(dataset_filename)
+# @app.get("/json")
+# async def read_json_file():
+#     global dataset_filename
+#     return FileResponse(dataset_filename)
 
 def update_dataset(skip):
     global dataset
