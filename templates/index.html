@@ -21,12 +21,24 @@
 
 <script type="text/javascript">
 
+let address;
+
+$(function() {
+    let searchParams = new URLSearchParams(window.location.search)
+    let hasAddress = searchParams.has('address')
+    if(hasAddress) {
+        address = searchParams.get('address')
+        search(address)
+    }
+});
+
 $('#search').click(function(){
     $('#search').html('LOADING...(this can take a while)');
+    address = $('#address').val()
+    search(address)
+})
 
-    let address = $('#address').val()
-
-  
+function search(address) {
     $.ajax({url: "/check/"+address.toLowerCase()}).done(function(data) {
         console.log(data)
         $('#results').html('')
@@ -36,9 +48,7 @@ $('#search').click(function(){
 
         $('#search').html('Search');
     });
-
-    
-})
+}
 
 </script>
 
