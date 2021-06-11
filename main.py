@@ -29,10 +29,50 @@ def main(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
+# @app.get("/{id}", response_class=HTMLResponse)
+# def quick(request: Request, id):
+#     return templates.TemplateResponse("index.html", {"request": request})
+
+
+
 # @app.get("/json")
 # async def read_json_file():
 #     global dataset_filename
 #     return FileResponse(dataset_filename)
+
+@app.get("/update/all")
+async def update_all():
+    id = "0"
+    count = 0
+    limit = 7000
+    while(count <= limit):
+        print(f"updating {id}  {count}")
+        query = '{submissions(first: 1000, where: {id_gt:"'+id+'", registered: true}){id creationTime submissionTime status registered name vouchees{id} requests{evidence{sender URI}}}}'
+        print(query)
+        r = requests.post(graph_url, json={'query': query})
+        data = r.json()
+        print("----------------------")
+        print(data)
+        print("----------------------")
+        for human in data["data"]["submissions"]:
+            scrape_profile(human)
+        try:
+            id = str(data["data"]["submissions"][len(data["data"]["submissions"])-1]["id"])
+        except:
+            break
+        count += 1000
+    return "done"
+
+# @app.get("/update/dataset/{skip}")
+async def updater(skip):
+    update_dataset()
+    data = read_dataset()
+    for human in data["data"]["submissions"]:
+        print("---")
+        print(human)
+        scrape_profile(human)
+        print("---")
+    return data
 
 def update_dataset(skip):
     global dataset
@@ -61,6 +101,7 @@ def read_dataset():
     return False
 
 def scrape_submission_image(path, human):
+    print("getting submission image for ", human["id"])
     try:
         uri = human["requests"][0]["evidence"][0]["URI"]
         file = f"https://ipfs.kleros.io{uri}"
@@ -86,8 +127,6 @@ def scrape_submission_image(path, human):
         id = human["id"]
         with open(f"{face_folder}/{id}.jpg", 'wb') as f:
             f.write(res.content)
-
-
     except Exception as e:
         print(e)
     return
@@ -121,17 +160,6 @@ def scrape_profile(human, save=True):
         print(e)
         return False
     
-@app.get("/update/dataset/{skip}")
-async def updater(skip):
-    update_dataset(skip)
-    data = read_dataset()
-    for human in data["data"]["submissions"]:
-        print("---")
-        print(human)
-        scrape_profile(human)
-        print("---")
-    return data
-
 
 def encode_face(dir, image):
     print(f"Encoding Face {image}")
