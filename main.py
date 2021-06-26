@@ -213,7 +213,7 @@ def read_encodings_file():
 def face_comparisons(input, encodings, face_ids):
     input_image = face_recognition.load_image_file(input)
     input_image_encoded = face_recognition.face_encodings(input_image)[0]
-    matches = face_recognition.compare_faces(encodings, input_image_encoded)
+    matches = face_recognition.compare_faces(encodings, input_image_encoded, tolerance=0.4)
     match_ids = []
     for i, match in enumerate(matches):
         if match:
