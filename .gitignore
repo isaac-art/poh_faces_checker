@@ -5,3 +5,4 @@ temp/*
 *.json
 encodings
 face_ids
+*.jpg

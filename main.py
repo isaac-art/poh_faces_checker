@@ -44,7 +44,7 @@ def main(request: Request):
 async def update_all():
     id = "0"
     count = 0
-    limit = 7000
+    limit = 9000
     while(count <= limit):
         print(f"updating {id}  {count}")
         query = '{submissions(first: 1000, where: {id_gt:"'+id+'", registered: true}){id creationTime submissionTime status registered name vouchees{id} requests{evidence{sender URI}}}}'
