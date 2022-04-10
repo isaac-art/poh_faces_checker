@@ -16,6 +16,7 @@ import os
 import shutil
 import pickle
 import asyncio
+import umap
 
 app = FastAPI()
 graph_id = "QmR36gmoXm1LtAm3yKZcEcHrdRz9MH2GARtx1YCb48Vz1g"
