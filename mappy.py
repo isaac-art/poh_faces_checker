@@ -3,7 +3,7 @@ import numpy as np
 import pickle
 import matplotlib.pyplot as plt
 import sqlite3
-from sklearn.preprocessing import StandardScaler
+
 
 def prepare_db():
     print("preparing")
