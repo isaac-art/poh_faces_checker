@@ -1,20 +1,50 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <title>PROFILE CHECKER</title>
+<head><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+    <title>FACE CHECKER</title>
 </head>
 <body>
+
+<div class="container">
+<h2>PoH Face Checker</h2>
 <p>Check if a person you are about to vouch for already exists in the registry.</p>
 <i>This script checks the spacings between eyes/ears/lips/etc of a given face and searches the faces of people already registered with PoH to find similar facial strucutres.</i>
 <br>
 <br>
-<label for="address">Enter the address of the profile you would like to check:</label>
-<input id="address" type="text" name="address" placeholder="0x.....">
-<button id="search" type="submit">Search</button>
 
-<h4>Similar Faces</h4>
-<div id="results">
-    
+<div class="form-group">
+    <label for="address">Enter the address of the profile you would like to check:</label>    
+    <div class="form-row">
+      <div class="col">
+        <input class="form-control" id="address" type="text" name="address" placeholder="0x.....">
+        </div>
+        <div class="col">
+        <button class="btn btn-info" id="search" type="submit">Search</button>
+        </div>
+    </div>
+</div>
+<hr>
+
+<h4 id="title" class="tohide">Input</h4>
+<div class="row" id="search_profile" >
+
+</div>
+
+<h4 id="title" class="tohide">Similar Faces </h4>
+<h6  class="tohide">Click on an image to visit the PoH profile.</h6>
+
+
+<div class="row" id="results" >
+
+</div>
+
+<hr>
+<footer class="footer tohide">
+    <br>
+    <i style="color:#777">If you'd like to support humanity.tools consider donating UBI to: 0x601729aCddB9E966822A90DE235d494647691F1d</i>
+    <br>
+</footer>
+
 </div>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
@@ -39,18 +69,35 @@ $('#search').click(function(){
 })
 
 function search(address) {
-    $.ajax({url: "/check/"+address.toLowerCase()}).done(function(data) {
+    $.ajax({url: "/check/"+address.toLowerCase()}).then(function(data) {
         console.log(data)
-        $('#results').html('')
-        for(let item in data){
-          $('#results').append("<a href='https://app.proofofhumanity.id/profile/"+data[item]+"?network=mainnet'><img src='/faces/"+data[item]+".jpg' width='300px' height='auto'/><br>"+data[item]+"</a><br>")
+        if(data.status === 'error'){
+            console.log("ERROR")
+            $('#search_profile').html('<div class="alert alert-warning">Error finding profile for this address</div>')
+            $('#search').html('Search');
+            return;
         }
-
+        $('#search_profile').html('')
+        $('#results').html('')
+        $('.tohide').hide();
+        for(let item in data){
+            if(data[item] == address.toLowerCase()) {
+                $('#search_profile').append("<div class='col-sm-3'><a href='https://app.proofofhumanity.id/profile/"+data[item]+"?network=mainnet'><img width='100%' src='/faces/"+data[item]+".jpg'/></a></div>")
+            }else{
+                $('#results').append("<div class='col-sm-3'><a href='https://app.proofofhumanity.id/profile/"+data[item]+"?network=mainnet'><img width='100%' src='/faces/"+data[item]+".jpg'/></a></div>")
+            }
+        }
+        $('.tohide').show();
         $('#search').html('Search');
     });
 }
 
 </script>
+<style>
+.tohide{
+    display:none;
+}
+</style>
 
 </body>
 </html>

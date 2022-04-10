@@ -38,7 +38,7 @@ async def check_profile(address):
     print("checking: ", address)
     global conn
     # make address lowercase
-    address = address.lower()
+    address = str(address.lower())
     c = conn.cursor()
     # check db for address
     res = c.execute("SELECT * FROM humans WHERE address = ?", (address,)).fetchone()
@@ -46,7 +46,11 @@ async def check_profile(address):
     if not res:
         print("not in db, scraping")
         r, profile = get_checking_profile(address)
-        scrape_profile(profile)
+        if r is False:
+            return {"status": "error", "message": "error getting profile"}
+        ok = scrape_profile(profile)
+        if not ok:
+            return {"status": "error", "message": "error scraping profile"}
         res = c.execute("SELECT * FROM humans WHERE address = ?", (address,)).fetchone()
     try:
         print(res)
@@ -56,7 +60,7 @@ async def check_profile(address):
         print("error finding similar", e)
         return False
 
-def find_similar_encodings(c, x, y, dist=0.1):
+def find_similar_encodings(c, x, y, dist=0.08):
     c.execute("SELECT address FROM humans WHERE embedding_x BETWEEN ? AND ? AND embedding_y BETWEEN ? AND ?", (x-dist, x+dist, y-dist, y+dist))
     results = c.fetchall()
     return results
@@ -65,11 +69,14 @@ def find_similar_encodings(c, x, y, dist=0.1):
 def get_checking_profile(address):
     query = '{submission(id:"'+address+'"){id status registered name requests{evidence{sender URI}}}}'
     print(query)
-    r = requests.post(graph_url, json={'query': query})
-    profile = r.json()
-    profile = profile["data"]["submission"]
-    print(profile)
-    return r.status_code, profile
+    try:
+        r = requests.post(graph_url, json={'query': query})
+        profile = r.json()
+        profile = profile["data"]["submission"]
+        return r.status_code, profile
+    except Exception as e:
+        print("error getting profile", e)
+        return False, False
 
 
 def check_dirs(path):
@@ -87,6 +94,7 @@ def check_dirs(path):
 def update(limit=17000):
     id = "0"
     count = 0
+    limit = int(limit)
     while(count <= limit):
         print(f"updating {id}  {count}")
         query = '{submissions(first: 1000, where: {id_gt:"'+id+'", registered: true}){id creationTime submissionTime status registered name vouchees{id} requests{evidence{sender URI}}}}'
@@ -103,11 +111,11 @@ def update(limit=17000):
     return "done"
 
 def scrape_profile(human, save=True):
-    folder = 'humans/{}'.format(human["id"])
-    print(folder)
-    path = os.path.join(os.path.abspath(os.getcwd()), folder)
-    folder_exists = check_dirs(path)
     try:
+        folder = 'humans/{}'.format(human["id"])
+        print(folder)
+        path = os.path.join(os.path.abspath(os.getcwd()), folder)
+        folder_exists = check_dirs(path)
         if folder_exists:
             return True
         else:
