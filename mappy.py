@@ -100,12 +100,12 @@ def demo_fit(address, reducer):
 
 if __name__ == "__main__":
     # prepare_db()
-    # update_db_with_encodings()
-    # makey()
+    update_db_with_encodings()
+    makey()
     # with open("umap_embedding.pkl", 'rb') as f:
     #     embedding = pickle.load(f)
     #     plot_umap(embedding)
     # with open("umap_reducer.pkl", 'rb') as f:
     #     reducer = pickle.load(f)
     # demo_fit("0xfff00b17888c7088dd625eeb210f58bda0dc08d9", reducer)
-    query()
+    # query()
