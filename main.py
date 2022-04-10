@@ -4,6 +4,10 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+import numpy as np
+import pickle
+import sqlite3
+
 import face_recognition
 import datetime
 import json
@@ -11,128 +15,62 @@ import requests
 import os
 import shutil
 import pickle
+import asyncio
 
 app = FastAPI()
-dataset = ""
-dataset_filename = "2021-04-10_16-05-26.json"
 graph_id = "QmR36gmoXm1LtAm3yKZcEcHrdRz9MH2GARtx1YCb48Vz1g"
 graph_url = "https://api.thegraph.com/subgraphs/name/kleros/proof-of-humanity-mainnet"
 kleros_ipfs = "https://ipfs.kleros.io"
-
-
+conn = None
+reducer = None
 
 templates = Jinja2Templates(directory="templates")
 app.mount("/faces", StaticFiles(directory="faces"), name="faces")
+
 
 @app.get("/", response_class=HTMLResponse)
 def main(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
-# @app.get("/{id}", response_class=HTMLResponse)
-# def quick(request: Request, id):
-#     return templates.TemplateResponse("index.html", {"request": request})
-
-
-
-# @app.get("/json")
-# async def read_json_file():
-#     global dataset_filename
-#     return FileResponse(dataset_filename)
-
-@app.get("/update/all")
-async def update_all():
-    id = "0"
-    count = 0
-    limit = 10000
-    while(count <= limit):
-        print(f"updating {id}  {count}")
-        query = '{submissions(first: 1000, where: {id_gt:"'+id+'", registered: true}){id creationTime submissionTime status registered name vouchees{id} requests{evidence{sender URI}}}}'
-        print(query)
-        r = requests.post(graph_url, json={'query': query})
-        data = r.json()
-        print("----------------------")
-        print(data)
-        print("----------------------")
-        for human in data["data"]["submissions"]:
-            scrape_profile(human)
-        try:
-            id = str(data["data"]["submissions"][len(data["data"]["submissions"])-1]["id"])
-        except:
-            break
-        count += 1000
-    return "done"
-
-# @app.get("/update/dataset/{skip}")
-async def updater(skip):
-    update_dataset()
-    data = read_dataset()
-    for human in data["data"]["submissions"]:
-        print("---")
-        print(human)
-        scrape_profile(human)
-        print("---")
-    return data
-
-def update_dataset(skip):
-    global dataset
-    query = "{submissions(where:{registered: true}, first:1000, skip:"+skip+"){id status registered name requests{evidence{sender URI}}}}"
-    r = requests.post(graph_url, json={'query': query})
-    dataset = r.json()
-    save_dataset_to_file()
-    return dataset
-
-def save_dataset_to_file():
-    global dataset
-    global dataset_filename
-    now = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    filename = f"{now}.json"
-    with open(filename, 'w') as f:
-        json.dump(dataset, f)
-        dataset_filename = filename
-        print(f"new dataset file called {dataset_filename}")
-
-def read_dataset():
-    global dataset
-    global dataset_filename
-    with open(dataset_filename, 'r') as f:
-        data = json.load(f)
-        return data
-    return False
-
-def scrape_submission_image(path, human):
-    print("getting submission image for ", human["id"])
+@app.get("/check/{address}")
+async def check_profile(address):
+    print("checking: ", address)
+    global conn
+    # make address lowercase
+    address = address.lower()
+    c = conn.cursor()
+    # check db for address
+    res = c.execute("SELECT * FROM humans WHERE address = ?", (address,)).fetchone()
+    # if not in db
+    if not res:
+        print("not in db, scraping")
+        r, profile = get_checking_profile(address)
+        scrape_profile(profile)
+        res = c.execute("SELECT * FROM humans WHERE address = ?", (address,)).fetchone()
     try:
-        uri = human["requests"][0]["evidence"][0]["URI"]
-        file = f"https://ipfs.kleros.io{uri}"
-        res = requests.get(file)
-        jres = res.json()
-        with open(f"{path}/evidence.json", 'w') as f:
-            json.dump(jres, f)
-        
-        uri = jres["fileURI"]
-        file = f"https://ipfs.kleros.io{uri}"
-        res = requests.get(file)
-        jres = res.json()
-        with open(f"{path}/registration.json", 'w') as f:
-            json.dump(jres, f)
-
-        uri = jres["photo"]
-        file = f"https://ipfs.kleros.io{uri}"
-        res = requests.get(file)
-        with open(f"{path}/image.jpg", 'wb') as f:
-            f.write(res.content)
-
-        face_folder = os.path.join(os.path.abspath(os.getcwd()), "faces")
-        id = human["id"]
-        with open(f"{face_folder}/{id}.jpg", 'wb') as f:
-            f.write(res.content)
+        print(res)
+        similar = find_similar_encodings(c, res[2], res[3])
+        return similar
     except Exception as e:
-        print(e)
-    return
+        print("error finding similar", e)
+        return False
 
-def scrape_submission_video():
-    return
+def find_similar_encodings(c, x, y, dist=0.1):
+    c.execute("SELECT address FROM humans WHERE embedding_x BETWEEN ? AND ? AND embedding_y BETWEEN ? AND ?", (x-dist, x+dist, y-dist, y+dist))
+    results = c.fetchall()
+    return results
+
+
+def get_checking_profile(address):
+    query = '{submission(id:"'+address+'"){id status registered name requests{evidence{sender URI}}}}'
+    print(query)
+    r = requests.post(graph_url, json={'query': query})
+    profile = r.json()
+    profile = profile["data"]["submission"]
+    print(profile)
+    return r.status_code, profile
+
 
 def check_dirs(path):
     isdir = os.path.isdir(path) 
@@ -144,8 +82,29 @@ def check_dirs(path):
         os.mkdir(path)
         return False
 
+
+@app.get("/update/{limit}")
+def update(limit=17000):
+    id = "0"
+    count = 0
+    while(count <= limit):
+        print(f"updating {id}  {count}")
+        query = '{submissions(first: 1000, where: {id_gt:"'+id+'", registered: true}){id creationTime submissionTime status registered name vouchees{id} requests{evidence{sender URI}}}}'
+        print(query)
+        r = requests.post(graph_url, json={'query': query})
+        data = r.json()
+        for human in data["data"]["submissions"]:
+            scrape_profile(human)
+        try:
+            id = str(data["data"]["submissions"][len(data["data"]["submissions"])-1]["id"])
+        except:
+            break
+        count += 1000
+    return "done"
+
 def scrape_profile(human, save=True):
-    folder = "humans/{}".format(human["id"])
+    folder = 'humans/{}'.format(human["id"])
+    print(folder)
     path = os.path.join(os.path.abspath(os.getcwd()), folder)
     folder_exists = check_dirs(path)
     try:
@@ -157,9 +116,68 @@ def scrape_profile(human, save=True):
             scraped_image = scrape_submission_image(path, human)
             return True
     except Exception as e:
-        print(e)
+        print("error scraping", e)
         return False
-    
+
+def scrape_submission_image(path, human):
+    global conn
+    print("getting submission image for ", human["id"])
+    try:
+        idd = human["id"]
+        uri = human["requests"][0]["evidence"][0]["URI"]
+        file = f"https://ipfs.kleros.io{uri}"
+        res = requests.get(file)
+        jres = res.json()
+        with open(f"{path}/evidence.json", 'w') as f:
+            json.dump(jres, f)
+        
+        uri = jres["fileURI"]
+        file = f"https://ipfs.kleros.io{uri}"
+        res = requests.get(file)
+        jres = res.json()
+        with open(f"{path}/registration.json", 'w') as f:
+            json.dump(jres, f)
+
+        uri = jres["photo"]
+        file = f"https://ipfs.kleros.io{uri}"
+        res = requests.get(file)
+        with open(f"{path}/{idd}.jpg", 'wb') as f:
+            f.write(res.content)
+
+        face_folder = os.path.join(os.path.abspath(os.getcwd()), "faces")
+        with open(f"{face_folder}/{idd}.jpg", 'wb') as f:
+            f.write(res.content)
+        
+        #  get face encoding
+        print("got files, doing fancy things")
+        ok, nm, enc = encode_face(face_folder, f"{idd}.jpg")
+        try:
+            enc_np = np.array(enc)
+            np_text = str(enc_np.tolist())
+            x, y = embed_encoding(enc_np)
+        except Exception as e:
+            print("error embedding", e)
+        # write to database
+        if ok:
+            try:
+                c = conn.cursor()
+                c.execute("INSERT OR REPLACE INTO humans VALUES (?, ?, ?, ?)", (str(nm), np_text, float(x), float(y)))
+                conn.commit()
+            except Exception as e:
+                print("error writing to db", e)
+    except Exception as e:
+        print("error getting files", e)
+    return
+
+def embed_encoding(enc_np):
+    global reducer
+    print("embedding face encoding")
+    embedding = reducer.transform([enc_np])
+    print(embedding)
+    x = float(embedding[0][0])
+    y = float(embedding[0][1])
+    print(x, y)
+    return x, y
 
 def encode_face(dir, image):
     print(f"Encoding Face {image}")
@@ -171,144 +189,24 @@ def encode_face(dir, image):
         print(e)
         return (False, False, False)
 
-def encode_faces():
-    images = os.listdir("faces")
-    encodings = []
-    face_ids = []
-    for image in images:
-        if image.startswith('.'):
-            pass
-        else:
-            ok, face_id, encoding = encode_face("faces", image)
-            if ok:
-                encodings.append(encoding)
-                face_ids.append(face_id)
-    return (encodings, face_ids)
 
-def update_encodings(encodings, face_ids):
-    # if file isnt already in face_ids then 
-    # encode and add to encodings/faceid lists
-    # and save the files 
-    return False
-
-@app.get("/update/encodings")
-async def write_encodings():
-    encodings, face_ids = encode_faces()
-    with open("encodings", 'wb') as f:
-        pickle.dump(encodings, f)
-        with open("face_ids", 'wb') as f:
-            pickle.dump(face_ids, f)
-            return True
-    return False
-
-def read_encodings_file():
-    encodings, face_ids = ([], [])
-    with open("encodings", 'rb') as f:
-        encodings = pickle.load(f)
-        with open("face_ids", 'rb') as f:
-            face_ids = pickle.load(f)
-            return (encodings, face_ids)
-    return False
-
-def face_comparisons(input, encodings, face_ids):
-    input_image = face_recognition.load_image_file(input)
-    input_image_encoded = face_recognition.face_encodings(input_image)[0]
-    matches = face_recognition.compare_faces(encodings, input_image_encoded, tolerance=0.575)
-    match_ids = []
-    for i, match in enumerate(matches):
-        if match:
-            print("---")
-            print(match)
-            print(i)
-            face_id = face_ids[i]
-            print(face_id)
-            match_ids.append(face_id)
-            # print(f"warn: input face was found in database at {face_id}")
-    # print(match_ids)
-    if len(match_ids) > 0:
-        return True, match_ids
-    return False, False
-
-# --------------------------------------------
-
-def get_checking_profile(id):
-    query = '{submission(id:"'+id+'"){id status registered name requests{evidence{sender URI}}}}'
-    print(query)
-    r = requests.post(graph_url, json={'query': query})
-    profile = r.json()
-    print(profile)
-    return r.status_code, profile
-
-def get_profile_image(path, human):
-    try:
-        print(human["requests"][0]["evidence"][0]["URI"])
-        uri = human["requests"][0]["evidence"][0]["URI"]
-        file = f"https://ipfs.kleros.io{uri}"
-        res = requests.get(file)
-        jres = res.json()
-        print("open evidence json")
-        with open(f"{path}/evidence.json", 'w') as f:
-            json.dump(jres, f)
-        
-        uri = jres["fileURI"]
-        file = f"https://ipfs.kleros.io{uri}"
-        res = requests.get(file)
-        jres = res.json()
-        print("open reg json")
-        with open(f"{path}/registration.json", 'w') as f:
-            json.dump(jres, f)
-
-        uri = jres["photo"]
-        file = f"https://ipfs.kleros.io{uri}"
-        res = requests.get(file)
-        print("open reg image")
-        with open(f"{path}/image.jpg", 'wb') as f:
-            f.write(res.content)
-        return (True, f'{path}/image.jpg')
-    except Exception as e:
-        return (False, e)
-
-@app.get("/check/{address}")
-async def check_profile(address):
-    print("checking: "+address)
-    status, profile = get_checking_profile(address)
-    if status == 200:
-        folder = "temp/"+address
-        temp_path = os.path.join(os.path.abspath(os.getcwd()), folder)
-        check_dirs(temp_path)
-        gpi_res, input = get_profile_image(temp_path, profile["data"]["submission"])
-        if gpi_res:
-            encodings, face_ids = read_encodings_file()
-            ret, matches = face_comparisons(input, encodings, face_ids)
-            if ret:
-                return matches
-            else:
-                return False
-        else:
-            return (False, input)
-    else:
-        return (False, False)
-
-# @app.get("/image/{address}")
-# async def get_image(address):
-#     try:
-#         f = open(f"faces/{address}.jpg")
-#         return FileResponse(f"faces/{address}.jpg")
-#     except IOError:
-#         return False
-    # return FileResponse(f"faces/{address}.jpg")
+    
+@app.on_event("startup")
+async def on_startup():
+    print("starting up")
+    global conn
+    global reducer
+    conn = sqlite3.connect("data.db")
+    with open("umap_reducer.pkl", 'rb') as f:
+        reducer = pickle.load(f)
+    
+    
+@app.on_event("shutdown")
+async def on_shutdown():
+    print("shutting down")
+    conn.close()
 
 
-
-
-# def main():
-#     updater() # uncomment to get graph data and profile images and store locally
-#     # write_encodings() # uncomment to write face encodings to file
-
-#     # encodings, face_ids = read_encodings_file() # read face encodings file
-#     # input = "test.png"  # src of test image to check against
-#     # face_comparisons(input, encodings, face_ids) # compare input with encodings
-
-
-# if __name__ == '__main__':
-#     main()
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -6,3 +6,4 @@ temp/*
 encodings
 face_ids
 *.jpg
+*.pkl
