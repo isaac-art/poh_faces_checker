@@ -6,4 +6,4 @@ temp/*
 encodings
 face_ids
 *.jpg
-*.pkl
+individual_encodings/*.pkl
