@@ -99,9 +99,9 @@ def demo_fit(address, reducer):
     print(embeddint)
 
 if __name__ == "__main__":
-    # prepare_db()
-    update_db_with_encodings()
-    makey()
+    prepare_db()
+    # update_db_with_encodings()
+    # makey()
     # with open("umap_embedding.pkl", 'rb') as f:
     #     embedding = pickle.load(f)
     #     plot_umap(embedding)

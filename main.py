@@ -111,6 +111,20 @@ def update(limit=17000):
         count += 1000
     return "done"
 
+@app.get("/refresh/{address}")
+def refresh():
+    print("checking: ", address)
+    global conn
+    # make address lowercase
+    address = str(address.lower())
+    r, profile = get_checking_profile(address)
+    if r is False:
+        return {"status": "error", "message": "error getting profile"}
+    ok = scrape_profile(profile)
+    if not ok:
+        return {"status": "error", "message": "error scraping profile"}
+
+
 def scrape_profile(human, save=True):
     try:
         folder = 'humans/{}'.format(human["id"])
