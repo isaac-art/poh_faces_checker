@@ -112,7 +112,7 @@ def update(limit=17000):
     return "done"
 
 @app.get("/refresh/{address}")
-def refresh():
+def refresh(address):
     print("checking: ", address)
     global conn
     # make address lowercase
