@@ -82,9 +82,9 @@ function search(address) {
         $('.tohide').hide();
         for(let item in data){
             if(data[item] == address.toLowerCase()) {
-                $('#search_profile').append("<div class='col-sm-3'><a href='https://app.proofofhumanity.id/profile/"+data[item]+"?network=mainnet'><img width='100%' src='/faces/"+data[item]+".jpg'/></a></div>")
+                $('#search_profile').append("<div class='col-sm-3'><a href='https://app.proofofhumanity.id/profile/"+data[item]+"?network=mainnet' target='_blank'><img width='100%' src='/faces/"+data[item]+".jpg'/></a></div>")
             }else{
-                $('#results').append("<div class='col-sm-3'><a href='https://app.proofofhumanity.id/profile/"+data[item]+"?network=mainnet'><img width='100%' src='/faces/"+data[item]+".jpg'/></a></div>")
+                $('#results').append("<div class='col-sm-3'><a href='https://app.proofofhumanity.id/profile/"+data[item]+"?network=mainnet' target='_blank'><img width='100%' src='/faces/"+data[item]+".jpg'/></a></div>")
             }
         }
         $('.tohide').show();
